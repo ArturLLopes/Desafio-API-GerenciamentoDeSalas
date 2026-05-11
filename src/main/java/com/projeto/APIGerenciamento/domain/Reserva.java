@@ -8,7 +8,17 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reservas")
+@Table(name = "reservas",
+        indexes = {
+                // Índice composto para a query de conflito — o campo mais seletivo
+                // (sala_id) vem primeiro, depois o intervalo de tempo
+                @Index(name = "idx_reservas_sala_periodo",
+                        columnList = "sala_id, inicio, fim"),
+
+                // Índice para listagens por usuário
+                @Index(name = "idx_reservas_usuario",
+                        columnList = "usuario_id")
+        })
 @Getter
 @NoArgsConstructor
 public class Reserva {
@@ -19,12 +29,12 @@ public class Reserva {
 
     // Sala reservada — obrigatório, nunca nulo
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "sala_id", nullable = false)
+    @JoinColumn(name = "sala_id", nullable = false,foreignKey = @ForeignKey(name = "fk_reserva_sala"))
     private Sala sala;
 
     // Usuário responsável pela reserva
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "usuario_id", nullable = false)
+    @JoinColumn(name = "usuario_id", nullable = false,foreignKey = @ForeignKey(name = "fk_reserva_usuario"))
     private Usuario usuario;
 
     // Intervalo semiaberto: [inicio, fim)
@@ -38,6 +48,7 @@ public class Reserva {
     private LocalDateTime fim;
 
     // Motivo opcional — melhora rastreabilidade e relatórios
+    @Column(length = 500)
     private String motivo;
 
     @Enumerated(EnumType.STRING)

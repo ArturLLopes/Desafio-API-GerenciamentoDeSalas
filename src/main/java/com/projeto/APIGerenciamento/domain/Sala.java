@@ -7,7 +7,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "salas")
+@Table(name = "salas",
+        uniqueConstraints = {
+                // Unicidade garantida no banco — a validação no service é uma segunda camada
+                @UniqueConstraint(name = "uk_sala_nome", columnNames = "nome")
+        })
 @Getter
 @NoArgsConstructor
 public class Sala {
@@ -31,7 +35,14 @@ public class Sala {
     private boolean ativa = true;
 
     // Localização física opcional — útil para buscas futuras
+    @Column(length = 200)
     private String localizacao;
+
+    // LAZY por padrão em @OneToMany — nunca carregue a lista de reservas
+    // de uma sala sem precisar dela, isso causaria um SELECT enorme
+    @OneToMany(mappedBy = "sala", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = false)
+    private java.util.List<Reserva> reservas = new java.util.ArrayList<>();
 
     public Sala(String nome, int capacidade, String localizacao) {
         this.nome = nome;
