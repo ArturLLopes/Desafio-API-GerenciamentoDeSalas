@@ -1,6 +1,5 @@
 package com.projeto.APIGerenciamento.repository;
 
-
 import com.projeto.APIGerenciamento.domain.Sala;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,7 +19,18 @@ public interface SalaRepository extends JpaRepository<Sala, Long> {
 
     boolean existsByNomeIgnoreCase(String nome);
 
-    // Busca salas com capacidade mínima — útil para filtrar por número de participantes
-    @Query("SELECT s FROM Sala s WHERE s.ativa = true AND s.capacidade >= :minCapacidade")
-    List<Sala> findAtivasComCapacidadeMinima(int minCapacidade);
+    boolean existsByNomeIgnoreCaseAndIdNot(
+            String nome,
+            Long id
+    );
+
+    @Query("""
+            SELECT s
+            FROM Sala s
+            WHERE s.ativa = true
+            AND s.capacidade >= :minCapacidade
+            """)
+    List<Sala> findAtivasComCapacidadeMinima(
+            int minCapacidade
+    );
 }
