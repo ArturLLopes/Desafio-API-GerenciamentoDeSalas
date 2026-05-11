@@ -12,5 +12,10 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop  # recria o schema a cada restart — OK em dev
+      ddl-auto: update
     show-sql: true
+    defer-datasource-initialization: true
+
+    sql:
+      init:
+        mode: always
