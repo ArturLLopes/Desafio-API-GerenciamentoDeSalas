@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: reservas-api
+
+  # Perfil ativo padrão — sobrescreva com -Dspring.profiles.active=prod
+  profiles:
+    active: dev
+
+  jpa:
+    # Gera DDL automaticamente apenas em dev/test
+    # Em produção, use Flyway ou Liquibase para migrations
+    hibernate:
+      ddl-auto: none
+    # Exibe SQL para depuração — desative em prod
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        # Dialect é inferido automaticamente — só defina se usar versão antiga
+        # dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          # Melhora performance de batch inserts futuros
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+
+server:
+  port: 8080

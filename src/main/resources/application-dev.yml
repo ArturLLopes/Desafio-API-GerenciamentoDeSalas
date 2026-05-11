@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:reservasdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true        # acesse em http://localhost:8080/h2-console
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # recria o schema a cada restart — OK em dev
+    show-sql: true
