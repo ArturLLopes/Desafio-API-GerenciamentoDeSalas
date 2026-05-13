@@ -1,0 +1,69 @@
+# =============================================================
+#  application-prod.yml — perfil de produção com Docker
+#  Todas as configurações sensíveis vêm de variáveis de ambiente.
+#  Nunca coloque valores reais diretamente neste arquivo.
+# =============================================================
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    # HikariCP — pool de conexões com valores conservadores para começar
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000      # 30s para obter conexão do pool
+      idle-timeout: 600000           # 10min antes de fechar conexão ociosa
+      max-lifetime: 1800000          # 30min de vida máxima por conexão
+      pool-name: ReservasHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate             # nunca recria schema em produção
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+
+  # Graceful shutdown — aguarda requisições em andamento terminarem
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:30s}
+
+server:
+  port: ${SERVER_PORT:8080}
+  # Compressão de respostas — melhora performance em JSON grande
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 1024
+
+# Spring Boot Actuator — endpoints de saúde e métricas
+management:
+  server:
+    port: 8081               # porta separada — não exposta ao público
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true        # /actuator/health/liveness e /readiness para k8s
+
+# Logs em formato JSON — facilita ingestão por Datadog, Splunk, etc.
+logging:
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.seuprojeto: ${LOGGING_LEVEL_COM_SEUPROJETO:INFO}
+  file:
+    name: /app/logs/reservas.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30        # mantém 30 dias de logs rotativos

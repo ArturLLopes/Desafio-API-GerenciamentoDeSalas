@@ -1,0 +1,393 @@
+# =============================================================
+# docker-compose.yml — API de Reservas de Salas
+# =============================================================
+#
+# Este arquivo possui 2 ambientes:
+#
+# DEV  → Desenvolvimento local usando H2
+# PROD → Produção usando PostgreSQL
+#
+# Comandos:
+#
+# Desenvolvimento:
+# docker compose --profile dev up --build
+#
+# Produção:
+# docker compose --profile prod up -d
+#
+# =============================================================
+
+services:
+
+  # ===========================================================
+  # APP - AMBIENTE DEV
+  # ===========================================================
+  #
+  # Ambiente focado em desenvolvimento local.
+  #
+  # Características:
+  # - Banco H2
+  # - Logs detalhados
+  # - Console H2 habilitado
+  # - Volume para persistir logs
+  #
+  app-dev:
+
+    # Serviço só sobe quando profile=dev
+    profiles: [dev]
+
+    build:
+      context: .
+
+      # Dockerfile principal do projeto
+      dockerfile: Dockerfile
+
+      # Usa apenas o estágio final da imagem
+      target: runtime
+
+    image: reservas-api:dev
+
+    container_name: reservas-dev
+
+    ports:
+      # API REST
+      - "8080:8080"
+
+      # Porta opcional para actuator
+      - "8081:8081"
+
+    environment:
+
+      # Define o profile Spring
+      SPRING_PROFILES_ACTIVE: dev
+
+      # Porta da aplicação
+      SERVER_PORT: 8080
+
+      # =======================================================
+      # H2 DATABASE
+      # =======================================================
+      #
+      # Banco H2 persistido em arquivo.
+      #
+      # Melhor que mem:
+      # jdbc:h2:mem
+      #
+      # Porque não perde dados ao reiniciar container.
+      #
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/reservasdb
+
+      SPRING_DATASOURCE_USERNAME: sa
+
+      SPRING_DATASOURCE_PASSWORD: ""
+
+      # Console H2 habilitado
+      SPRING_H2_CONSOLE_ENABLED: "true"
+
+      # =======================================================
+      # LOGS DEV
+      # =======================================================
+      #
+      # Logs mais verbosos para debug.
+      #
+      LOGGING_LEVEL_ROOT: INFO
+
+      LOGGING_LEVEL_COM_PROJETO_APIGERENCIAMENTO: DEBUG
+
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: DEBUG
+
+      # =======================================================
+      # SPRING ACTUATOR
+      # =======================================================
+      #
+      # Readiness e liveness probes.
+      #
+      MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+
+      MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED: "true"
+
+      MANAGEMENT_HEALTH_READINESSSTATE_ENABLED: "true"
+
+    volumes:
+
+      # Persistência dos logs
+      - ./logs/dev:/app/logs
+
+      # Persistência do banco H2
+      - ./data:/app/data
+
+    # =========================================================
+    # HEALTHCHECK
+    # =========================================================
+    #
+    # Verifica se aplicação está saudável.
+    #
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health/readiness || exit 1"
+        ]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 3
+
+      start_period: 40s
+
+    # Reinicia automaticamente se cair
+    restart: unless-stopped
+
+    # =========================================================
+    # LOG ROTATION
+    # =========================================================
+    #
+    # Evita crescimento infinito dos logs Docker.
+    #
+    logging:
+      driver: json-file
+
+      options:
+        max-size: "10m"
+
+        max-file: "3"
+
+    # =========================================================
+    # NETWORK
+    # =========================================================
+    #
+    # Rede isolada da aplicação.
+    #
+    networks:
+      - reservas-network
+
+  # ===========================================================
+  # POSTGRESQL - PRODUÇÃO
+  # ===========================================================
+  #
+  # Banco oficial de produção.
+  #
+  postgres:
+
+    profiles: [prod]
+
+    image: postgres:16-alpine
+
+    container_name: reservas-postgres
+
+    environment:
+
+      # Nome do banco
+      POSTGRES_DB: reservasdb
+
+      # Usuário vindo do .env
+      POSTGRES_USER: ${DB_USERNAME}
+
+      # Senha vinda do .env
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    volumes:
+
+      # Volume persistente do PostgreSQL
+      - postgres_data:/var/lib/postgresql/data
+
+      # Script executado na primeira inicialização
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    # =========================================================
+    # IMPORTANTE
+    # =========================================================
+    #
+    # Em produção real NÃO exponha a porta 5432.
+    #
+    # O app acessa o banco internamente pela rede Docker.
+    #
+    # Descomente apenas se quiser acessar via DBeaver.
+    #
+    # ports:
+    #   - "5432:5432"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME} -d reservasdb"
+        ]
+
+      interval: 10s
+
+      timeout: 5s
+
+      retries: 5
+
+      start_period: 10s
+
+    restart: unless-stopped
+
+    logging:
+      driver: json-file
+
+      options:
+        max-size: "10m"
+
+        max-file: "3"
+
+    networks:
+      - reservas-network
+
+  # ===========================================================
+  # APP - PRODUÇÃO
+  # ===========================================================
+  #
+  # Aplicação conectada ao PostgreSQL.
+  #
+  app-prod:
+
+    profiles: [prod]
+
+    build:
+      context: .
+
+      dockerfile: Dockerfile
+
+      target: runtime
+
+    image: reservas-api:latest
+
+    container_name: reservas-prod
+
+    ports:
+      - "8080:8080"
+
+    environment:
+
+      # Profile Spring
+      SPRING_PROFILES_ACTIVE: prod
+
+      SERVER_PORT: 8080
+
+      # =======================================================
+      # POSTGRES CONNECTION
+      # =======================================================
+      #
+      # "postgres" é o nome do serviço.
+      #
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reservasdb
+
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      # =======================================================
+      # HIBERNATE
+      # =======================================================
+      #
+      # Nunca usar create/create-drop em produção.
+      #
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+
+      # =======================================================
+      # LOGS
+      # =======================================================
+      #
+      # Produção → logs menos verbosos.
+      #
+      LOGGING_LEVEL_ROOT: INFO
+
+      LOGGING_LEVEL_COM_PROJETO_APIGERENCIAMENTO: INFO
+
+      # =======================================================
+      # SHUTDOWN GRACEFUL
+      # =======================================================
+      #
+      # Espera requisições terminarem antes de desligar.
+      #
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
+
+      # =======================================================
+      # ACTUATOR
+      # =======================================================
+      #
+      MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+
+      MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED: "true"
+
+      MANAGEMENT_HEALTH_READINESSSTATE_ENABLED: "true"
+
+    volumes:
+
+      # Persistência dos logs
+      - ./logs/prod:/app/logs
+
+    # =========================================================
+    # DEPENDÊNCIA
+    # =========================================================
+    #
+    # Aguarda PostgreSQL ficar saudável.
+    #
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health/readiness || exit 1"
+        ]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 3
+
+      start_period: 60s
+
+    restart: unless-stopped
+
+    logging:
+      driver: json-file
+
+      options:
+        max-size: "10m"
+
+        max-file: "3"
+
+    # =========================================================
+    # LIMITES DE RECURSOS
+    # =========================================================
+    #
+    # Evita consumo exagerado.
+    #
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+          cpus: "1.0"
+
+    networks:
+      - reservas-network
+
+# =============================================================
+# NETWORKS
+# =============================================================
+#
+# Rede isolada dos containers.
+#
+networks:
+  reservas-network:
+    driver: bridge
+
+# =============================================================
+# VOLUMES
+# =============================================================
+#
+# Persistência dos dados PostgreSQL.
+#
+volumes:
+  postgres_data:
+    driver: local

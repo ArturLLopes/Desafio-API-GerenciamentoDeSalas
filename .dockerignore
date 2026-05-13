@@ -1,0 +1,43 @@
+# =============================================================
+#  .dockerignore — exclui arquivos do contexto de build Docker
+#  Quanto menor o contexto, mais rápido o "docker build".
+# =============================================================
+
+# Artefatos de build Java — o Maven os recria dentro do container
+target/
+*.class
+*.jar
+*.war
+
+# Cache Maven local — não deve entrar na imagem
+.m2/
+
+# Controle de versão
+.git/
+.gitignore
+.gitattributes
+
+# Configuração de IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+*.DS_Store
+
+# Arquivos de ambiente — NUNCA incluir no contexto de build
+.env
+.env
+!.env.example          # o exemplo pode ser incluído
+
+# Logs locais
+logs/
+*.log
+
+# Documentação e testes que não vão para a imagem de runtime
+README.md
+CONTRIBUTING.md
+docs/
+
+# Docker compose — não precisa estar dentro do container
+docker-compose*.yml
+Dockerfile*
