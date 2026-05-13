@@ -1,0 +1,621 @@
+````md
+# API REST para Gerenciamento de Reservas de Salas
+
+## Descrição do Projeto
+
+Neste desafio, será desenvolvida uma API REST para gerenciamento de reservas de salas utilizando Java com Spring Boot, aplicando conceitos fundamentais de desenvolvimento back-end, arquitetura em camadas, persistência de dados, testes automatizados e boas práticas de engenharia de software.
+
+O projeto tem como objetivo consolidar conhecimentos relacionados a:
+
+- Programação Orientada a Objetos (POO)
+- Desenvolvimento de APIs REST CRUD
+- Persistência de dados com Spring Data JPA
+- Regras de negócio e validações
+- Arquitetura em camadas
+- Testes unitários
+- Versionamento com Git e GitHub
+- Containerização com Docker
+
+A aplicação permitirá o gerenciamento de:
+
+- Salas
+- Usuários
+- Reservas
+
+Além disso, o sistema deverá garantir regras essenciais como prevenção de conflitos de horários, controle de status de reservas e validações de domínio.
+
+---
+
+# 1. Objetivos do Projeto
+
+## Objetivo Geral
+
+Construir uma API REST robusta, organizada e escalável para gerenciamento de reservas de salas.
+
+## Objetivos Específicos
+
+- Modelar entidades e relacionamentos
+- Aplicar boas práticas de arquitetura
+- Implementar regras de negócio
+- Criar endpoints REST padronizados
+- Persistir dados em banco relacional
+- Realizar testes unitários
+- Empacotar a aplicação com Docker
+
+---
+
+# 2. Arquitetura da Aplicação
+
+A aplicação seguirá uma arquitetura em camadas:
+
+```text
+Controller → Service → Repository → Banco de Dados
+````
+
+## Camadas da Aplicação
+
+### Controller
+
+Responsável pelas requisições HTTP e respostas da API.
+
+### Service
+
+Responsável pelas regras de negócio e validações.
+
+### Repository
+
+Responsável pela persistência e acesso aos dados.
+
+### Entity
+
+Representação das entidades do domínio.
+
+---
+
+# 3. Modelagem do Domínio
+
+## Entidades Principais
+
+### Sala
+
+Representa uma sala disponível para reservas.
+
+#### Atributos sugeridos
+
+* id
+* nome
+* capacidade
+* ativa
+
+#### Responsabilidades
+
+* Armazenar informações da sala
+* Validar capacidade
+* Informar disponibilidade
+
+---
+
+### Usuario
+
+Representa um usuário do sistema.
+
+#### Atributos sugeridos
+
+* id
+* nome
+* email
+
+#### Responsabilidades
+
+* Identificar o responsável pela reserva
+* Manter dados cadastrais
+
+---
+
+### Reserva
+
+Representa uma reserva realizada em uma sala.
+
+#### Atributos sugeridos
+
+* id
+* dataInicio
+* dataFim
+* status
+* sala
+* usuario
+
+#### Responsabilidades
+
+* Controlar horários
+* Validar conflitos
+* Gerenciar cancelamentos
+
+---
+
+# 4. Relacionamentos
+
+## Reserva → Sala
+
+Uma reserva pertence a uma sala.
+
+```text
+Muitas reservas para uma sala
+```
+
+---
+
+## Reserva → Usuario
+
+Uma reserva pertence a um usuário.
+
+```text
+Muitas reservas para um usuário
+```
+
+---
+
+# 5. Regras de Negócio
+
+## Validações Obrigatórias
+
+### Sala
+
+* Capacidade deve ser maior que zero
+* Sala inativa não pode receber reservas
+
+### Reserva
+
+* Data inicial deve ser anterior à data final
+* Não permitir reservas sobrepostas
+* Reservas canceladas não entram em conflito
+
+---
+
+# 6. Regra de Conflito de Horários
+
+## Política de Intervalo
+
+Será utilizado intervalo semiaberto:
+
+```text
+[início, fim)
+```
+
+Isso significa:
+
+* O horário inicial é incluído
+* O horário final não é incluído
+
+---
+
+## Exemplos
+
+| Reserva A     | Reserva B     | Resultado |
+| ------------- | ------------- | --------- |
+| 10:00 - 11:00 | 11:00 - 12:00 | Permitido |
+| 10:00 - 11:00 | 10:30 - 11:30 | Conflito  |
+| 10:00 - 11:00 | 09:00 - 10:00 | Permitido |
+
+---
+
+# 7. Status da Reserva
+
+## Enumeração de Status
+
+```java
+public enum StatusReserva {
+    ATIVA,
+    CANCELADA
+}
+```
+
+---
+
+## Regras
+
+### Reserva Ativa
+
+* Participa da validação de conflito
+* Pode ser cancelada
+
+### Reserva Cancelada
+
+* Não participa da validação de conflito
+* Permanece registrada no histórico
+
+---
+
+# 8. Estrutura REST da API
+
+## Prefixo de Versionamento
+
+```text
+/api/v1
+```
+
+---
+
+# 9. Endpoints da API
+
+## Sala
+
+| Método | Endpoint    | Descrição      |
+| ------ | ----------- | -------------- |
+| GET    | /salas      | Listar salas   |
+| GET    | /salas/{id} | Buscar sala    |
+| POST   | /salas      | Criar sala     |
+| PUT    | /salas/{id} | Atualizar sala |
+| DELETE | /salas/{id} | Remover sala   |
+
+---
+
+## Usuario
+
+| Método | Endpoint       | Descrição         |
+| ------ | -------------- | ----------------- |
+| GET    | /usuarios      | Listar usuários   |
+| GET    | /usuarios/{id} | Buscar usuário    |
+| POST   | /usuarios      | Criar usuário     |
+| PUT    | /usuarios/{id} | Atualizar usuário |
+| DELETE | /usuarios/{id} | Remover usuário   |
+
+---
+
+## Reserva
+
+| Método | Endpoint                | Descrição         |
+| ------ | ----------------------- | ----------------- |
+| GET    | /reservas               | Listar reservas   |
+| GET    | /reservas/{id}          | Buscar reserva    |
+| POST   | /reservas               | Criar reserva     |
+| PUT    | /reservas/{id}          | Atualizar reserva |
+| PATCH  | /reservas/{id}/cancelar | Cancelar reserva  |
+
+---
+
+# 10. Serviços da Aplicação
+
+## SalaService
+
+Responsável por:
+
+* Cadastro de salas
+* Atualização
+* Remoção
+* Validação de capacidade
+
+---
+
+## UsuarioService
+
+Responsável por:
+
+* Cadastro de usuários
+* Atualização
+* Remoção
+
+---
+
+## ReservaService
+
+Responsável por:
+
+* Criação de reservas
+* Cancelamento
+* Validação de conflitos
+* Validação de regras de negócio
+
+---
+
+# 11. Tratamento de Erros
+
+## Padronização de Respostas
+
+### Códigos HTTP
+
+| Código | Significado            |
+| ------ | ---------------------- |
+| 400    | Dados inválidos        |
+| 404    | Recurso não encontrado |
+| 409    | Conflito de reserva    |
+| 500    | Erro interno           |
+
+---
+
+## Exemplo de Resposta de Erro
+
+```json
+{
+  "timestamp": "2026-05-13T12:00:00",
+  "status": 400,
+  "erro": "Validação",
+  "mensagem": "Capacidade deve ser maior que zero"
+}
+```
+
+---
+
+# 12. Persistência com Spring Data JPA
+
+## Objetivos
+
+* Persistir entidades
+* Criar relacionamentos
+* Executar consultas
+* Aplicar paginação
+* Garantir integridade transacional
+
+---
+
+## Banco de Dados
+
+Pode ser utilizado:
+
+* PostgreSQL
+* MySQL
+* H2 Database
+
+---
+
+# 13. Configuração da Camada JPA
+
+## Funcionalidades Utilizadas
+
+* Hibernate
+* Spring Data JPA
+* Relacionamentos @OneToMany e @ManyToOne
+* Lazy Loading
+* Paginação
+* Consultas customizadas
+
+---
+
+# 14. Consultas Necessárias
+
+## Consulta de Conflito
+
+Buscar reservas:
+
+* da mesma sala
+* no mesmo intervalo
+* com status ATIVA
+
+---
+
+## Paginação
+
+Implementar listagens paginadas para:
+
+* Salas
+* Usuários
+* Reservas
+
+---
+
+# 15. Controle Transacional
+
+Métodos críticos deverão utilizar:
+
+```java
+@Transactional
+```
+
+---
+
+## Objetivo
+
+Garantir atomicidade em:
+
+* criação de reservas
+* validação de conflitos
+* cancelamentos
+
+---
+
+# 16. Testes Unitários
+
+## Objetivos
+
+Garantir:
+
+* estabilidade
+* confiabilidade
+* prevenção de regressões
+
+---
+
+# 17. Estrutura de Testes
+
+## Ferramentas
+
+* JUnit
+* Mockito
+
+---
+
+## Cenários de Teste
+
+### Reserva
+
+* Criar reserva válida
+* Impedir conflito
+* Permitir horários consecutivos
+* Ignorar reservas canceladas
+
+---
+
+### Validações
+
+* Capacidade inválida
+* Datas inválidas
+* Sala inativa
+
+---
+
+### API
+
+* Verificar códigos HTTP
+* Verificar mensagens de erro
+
+---
+
+# 18. Cobertura de Testes
+
+A cobertura deve focar principalmente:
+
+* regras de negócio
+* validações
+* fluxos críticos
+
+A métrica deve ser utilizada como referência e não como único indicador de qualidade.
+
+---
+
+# 19. Estrutura Sugerida do Projeto
+
+```text
+src
+ └── main
+      ├── java
+      │    └── com.projeto
+      │          ├── controller
+      │          ├── service
+      │          ├── repository
+      │          ├── entity
+      │          ├── dto
+      │          ├── exception
+      │          └── config
+      └── resources
+           ├── application.yml
+           ├── application-dev.yml
+           └── application-test.yml
+```
+
+---
+
+# 20. Versionamento com Git
+
+## Boas Práticas
+
+* Commits pequenos
+* Mensagens descritivas
+* Uso de branches
+* Pull Requests
+* README documentado
+
+---
+
+# 21. Containerização com Docker
+
+## Objetivo
+
+Padronizar o ambiente da aplicação e facilitar execução.
+
+---
+
+# 22. Dockerfile
+
+O projeto deverá possuir um Dockerfile para:
+
+* build da aplicação
+* geração da imagem
+* execução da API
+
+---
+
+# 23. Docker Compose
+
+O projeto poderá utilizar:
+
+```yaml
+docker-compose.yml
+```
+
+Para orquestrar:
+
+* API
+* Banco de dados
+
+---
+
+# 24. Variáveis de Ambiente
+
+## Exemplo
+
+```env
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=reservas
+DB_USER=admin
+DB_PASSWORD=123456
+```
+
+---
+
+# 25. Tecnologias Utilizadas
+
+## Back-End
+
+* Java
+* Spring Boot
+* Spring Web
+* Spring Data JPA
+
+---
+
+## Banco de Dados
+
+* PostgreSQL
+* MySQL
+* H2
+
+---
+
+## Testes
+
+* JUnit
+* Mockito
+
+---
+
+## Ferramentas
+
+* Maven
+* Docker
+* Git
+* GitHub
+
+---
+
+# 26. Resultado Esperado
+
+Ao final do projeto, a aplicação deverá:
+
+* Disponibilizar uma API REST funcional
+* Persistir dados em banco relacional
+* Validar conflitos de reservas
+* Possuir testes automatizados
+* Seguir boas práticas de arquitetura
+* Estar pronta para execução em Docker
+
+---
+
+# 27. Considerações Finais
+
+Este projeto foi estruturado para consolidar conhecimentos fundamentais de desenvolvimento back-end moderno utilizando Java e Spring Boot.
+
+Ao concluir o desafio, será possível demonstrar competências importantes relacionadas a:
+
+* modelagem de domínio
+* arquitetura de software
+* APIs REST
+* persistência de dados
+* testes automatizados
+* containerização
+* boas práticas de desenvolvimento
+
+Além disso, a aplicação servirá como base para futuras evoluções, integrações e melhorias arquiteturais.
+
+```
+```
